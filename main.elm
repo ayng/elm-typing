@@ -1,140 +1,221 @@
-import Html exposing (Html, div, text, br)
-import Keyboard exposing (KeyCode)
-import Char exposing (fromCode)
-import String exposing (concat)
+module Main exposing (..)
+
+import Json.Decode
+import String
 import List
 import Maybe
+import Css exposing (..)
+import Css.Colors exposing (black)
+import Keyboard
+import Char exposing (KeyCode)
+import Html
+import Html.Styled exposing (..)
+import Html.Styled.Events exposing (on, onInput, onFocus, onBlur, keyCode)
+import Html.Styled.Attributes exposing (css, placeholder, value)
+
 
 main =
-  Html.program
-    { init = init
-    , view = view
-    , update = update
-    , subscriptions = subscriptions
-    }
+    Html.program
+        { init = init
+        , view = view >> toUnstyled
+        , update = update
+        , subscriptions = subscriptions
+        }
 
-type alias Zombie =
-  { completed : List Char
-  , next : Char
-  , waiting : List Char
-  }
 
-shoot : Char -> Zombie -> Zombie
-shoot char zombie =
-  if char == zombie.next then
-    case zombie.waiting of
-      [] -> zombie
-      c :: cs -> Zombie (char :: zombie.completed) c cs
-  else 
-    zombie
-
-unshoot : Zombie -> Zombie
-unshoot zombie =
-  case zombie.completed of
-    [] -> zombie
-    c :: cs -> Zombie cs c (zombie.next :: zombie.waiting)
 
 -- MODEL
 
-type alias Model = 
-  { buffer : List Char
-  , zombies : List Zombie
-  , last : KeyCode
-  , count : Int
-  }
 
-init : (Model, Cmd Msg)
+type alias Target =
+    { chars : List Char
+    , done : List Bool
+    }
+
+
+target : String -> Target
+target x =
+    { chars = String.toList x, done = List.repeat (String.length x) False }
+
+
+shoot : Target -> String -> Target
+shoot target text =
+    { target
+        | done = matching target.chars (String.toList text)
+    }
+
+
+matching : List Char -> List Char -> List Bool
+matching expected actual =
+    if List.length actual > List.length expected then
+        List.repeat (List.length expected) False
+    else
+        case expected of
+            [] ->
+                []
+
+            expectedFirst :: expectedRest ->
+                case actual of
+                    [] ->
+                        False :: matching expectedRest []
+
+                    actualFirst :: actualRest ->
+                        (actualFirst == expectedFirst)
+                            :: matching expectedRest actualRest
+
+
+type alias Model =
+    { field : String
+    , placeholder : String
+    , targets : List Target
+    }
+
+
+init : ( Model, Cmd Msg )
 init =
-  ({ buffer = []
-   , zombies =
-     [ Zombie [] 'K' (String.toList "illifish")
-     , Zombie [] 'K' (String.toList "ill the fish")
-     ]
-   , last = 0
-   , count = 0
-   }, Cmd.none)
+    ( { field = ""
+      , placeholder = "Click here to begin!"
+      , targets =
+            [ target "hello"
+            , target "HENlo"
+            , target "world!"
+            ]
+      }
+    , Cmd.none
+    )
+
+
 
 -- UPDATE
 
-type Msg
-  = Press KeyCode
-  | Down KeyCode
 
-update : Msg -> Model -> (Model, Cmd Msg)
+type Msg
+    = Change String
+    | Confirm
+    | Focus
+    | Blur
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-  case msg of
-    Down code ->
-      if code == k_backspace || code == k_delete then
-        ({ model
-        | buffer = case model.buffer of
-          [] -> []
-          c :: cs -> cs
-        , last = code
-        , zombies = List.map unshoot model.zombies
-        }, Cmd.none)
-      else
-        ({ model | last = code }, Cmd.none)
-    Press code ->
-      if isValid code then
-        ({ model
-        | buffer = Char.fromCode code :: model.buffer
-        , last = code
-        , zombies = List.map (shoot (Char.fromCode code)) model.zombies
-        }, Cmd.none)
-      else
-        ({ model | last = code }, Cmd.none)
+    case msg of
+        Blur ->
+            ( { model
+                | placeholder = "Click to resume"
+              }
+            , Cmd.none
+            )
+
+        Focus ->
+            ( { model
+                | placeholder = ""
+              }
+            , Cmd.none
+            )
+
+        Confirm ->
+            ( { model
+                | field = ""
+                , targets =
+                    List.foldr
+                        (\t ts ->
+                            if List.foldr (&&) True t.done then
+                                ts
+                            else
+                                t :: ts
+                        )
+                        []
+                        model.targets
+              }
+            , Cmd.none
+            )
+
+        Change text ->
+            ( { model
+                | field = text
+                , targets = List.map (\t -> shoot t text) model.targets
+              }
+            , Cmd.none
+            )
+
+
 
 -- SUBSCRIPTIONS
 
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Sub.batch
-    [ Keyboard.presses Press
-    , Keyboard.downs Down
-    ]
+    Sub.batch
+        []
+
+
 
 -- VIEW
 
+
+untyped : Style
+untyped =
+    Css.batch
+        [ color black
+        ]
+
+
+typed : Style
+typed =
+    Css.batch
+        [ color (hex "aaa")
+        ]
+
+
+viewTarget : Target -> List (Html Msg)
+viewTarget target =
+    List.map2
+        (\c b ->
+            span
+                [ css
+                    [ if b then
+                        typed
+                      else
+                        untyped
+                    ]
+                ]
+                [ text <| String.fromChar c ]
+        )
+        target.chars
+        target.done
+
+
+
+-- onEnter : https://github.com/evancz/elm-todomvc/blob/166e5f2afc704629ee6d03de00deac892dfaeed0/Todo.elm#L237-L246
+
+
+onEnter : Msg -> Attribute Msg
+onEnter msg =
+    let
+        isEnter code =
+            if code == 13 then
+                Json.Decode.succeed msg
+            else
+                Json.Decode.fail "not ENTER"
+    in
+        on "keydown" (Json.Decode.andThen isEnter keyCode)
+
+
 view : Model -> Html Msg
 view model =
-  div [] <|
-    List.intersperse
-      (br [] [])
-      (
-        [ text (String.fromList (List.reverse model.buffer))
-        , text (toString model.last)
-        , text (toString model.count)
+    div []
+        [ input
+            [ onInput Change
+            , onEnter Confirm
+            , onFocus Focus
+            , onBlur Blur
+            , placeholder model.placeholder
+            , value model.field
+            ]
+            []
+        , ul []
+            (List.map
+                (\t -> li [] (viewTarget t))
+                model.targets
+            )
         ]
-        ++
-        (List.map
-          (\zombie -> text (String.fromList (zombie.next :: zombie.waiting)))
-          model.zombies
-        )
-      )
-
--- keycode constants
-k_backspace = 8
-k_delete = 46
-k_space = Char.toCode ' '
-k_period = Char.toCode '.'
-k_comma = Char.toCode ','
-k_bang = Char.toCode '!'
-k_question = Char.toCode '?'
-k_zero = Char.toCode '0'
-k_nine = Char.toCode '9'
-k_a = Char.toCode 'a'
-k_z = Char.toCode 'z'
-k_A = Char.toCode 'A'
-k_Z = Char.toCode 'Z'
-
-isValid : KeyCode -> Bool
-isValid code
-  = k_a <= code && code <= k_z
-  || k_A <= code && code <= k_Z
-  || k_zero <= code && code <= k_nine
-  || code == k_space
-  || code == k_bang
-  || code == k_question
-  || code == k_comma
-  || code == k_period
-
