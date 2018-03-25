@@ -27,43 +27,6 @@ main =
 -- MODEL
 
 
-type alias Target =
-    { chars : List Char
-    , done : List Bool
-    }
-
-
-target : String -> Target
-target x =
-    { chars = String.toList x, done = List.repeat (String.length x) False }
-
-
-shoot : Target -> String -> Target
-shoot target text =
-    { target
-        | done = matching target.chars (String.toList text)
-    }
-
-
-matching : List Char -> List Char -> List Bool
-matching expected actual =
-    if List.length actual > List.length expected then
-        List.repeat (List.length expected) False
-    else
-        case expected of
-            [] ->
-                []
-
-            expectedFirst :: expectedRest ->
-                case actual of
-                    [] ->
-                        False :: matching expectedRest []
-
-                    actualFirst :: actualRest ->
-                        (actualFirst == expectedFirst)
-                            :: matching expectedRest actualRest
-
-
 type alias Model =
     { field : String
     , placeholder : String
@@ -76,10 +39,7 @@ init =
     ( { field = ""
       , placeholder = "Click here to begin!"
       , targets =
-            [ "hello"
-            , "foo"
-            , "world!"
-            ]
+            List.repeat 500 "hello"
       }
     , Cmd.none
     )
@@ -101,7 +61,7 @@ update msg model =
     case msg of
         Blur ->
             ( { model
-                | placeholder = "Click to resume"
+                | placeholder = "Click here to resume"
               }
             , Cmd.none
             )
@@ -143,41 +103,33 @@ subscriptions model =
 -- VIEW
 
 
-untyped : Style
-untyped =
-    Css.batch
-        [ color black
+view : Model -> Html Msg
+view model =
+    div []
+        [ input
+            [ onInput Change
+            , onEnter Confirm
+            , onFocus Focus
+            , onBlur Blur
+            , placeholder model.placeholder
+            , value model.field
+            ]
+            []
+        , ul []
+            (List.map
+                (\target ->
+                    let
+                        targetChars =
+                            String.toList target
+
+                        fieldChars =
+                            String.toList model.field
+                    in
+                        li [] (viewTarget targetChars (matching targetChars fieldChars))
+                )
+                model.targets
+            )
         ]
-
-
-typed : Style
-typed =
-    Css.batch
-        [ color (hex "aaa")
-        ]
-
-
-viewStringTarget : String -> String -> List (Html Msg)
-viewStringTarget expected actual =
-    viewTarget (shoot (target expected) actual)
-
-
-viewTarget : Target -> List (Html Msg)
-viewTarget target =
-    List.map2
-        (\c b ->
-            span
-                [ css
-                    [ if b then
-                        typed
-                      else
-                        untyped
-                    ]
-                ]
-                [ text <| String.fromChar c ]
-        )
-        target.chars
-        target.done
 
 
 
@@ -196,26 +148,46 @@ onEnter msg =
         on "keydown" (Json.Decode.andThen isEnter keyCode)
 
 
+matching : List Char -> List Char -> List Bool
+matching expected actual =
+    if List.length expected < List.length actual then
+        List.map (\_ -> False) expected
+    else
+        case expected of
+            [] ->
+                []
 
--- Html.Styled.Events.on : String -> Json.Decode.Decoder msg -> Html.Styled.Attribute msg
--- Json.Decode.andThen : (a -> Json.Decode.Decoder b) -> Json.Decode.Decoder a -> Json.Decode.Decoder b
+            expectedFirst :: expectedRest ->
+                case actual of
+                    [] ->
+                        False :: matching expectedRest []
+
+                    actualFirst :: actualRest ->
+                        (actualFirst == expectedFirst) :: matching expectedRest actualRest
 
 
-view : Model -> Html Msg
-view model =
-    div []
-        [ input
-            [ onInput Change
-            , onEnter Confirm
-            , onFocus Focus
-            , onBlur Blur
-            , placeholder model.placeholder
-            , value model.field
-            ]
-            []
-        , ul []
-            (List.map
-                (\t -> li [] (viewStringTarget t model.field))
-                model.targets
-            )
+viewTarget : List Char -> List Bool -> List (Html Msg)
+viewTarget chars mask =
+    List.map2
+        (\char bit ->
+            if bit then
+                span [ css [ typed ] ] [ text <| String.fromChar char ]
+            else
+                span [ css [ untyped ] ] [ text <| String.fromChar char ]
+        )
+        chars
+        mask
+
+
+untyped : Style
+untyped =
+    Css.batch
+        [ color black
+        ]
+
+
+typed : Style
+typed =
+    Css.batch
+        [ color (hex "aaa")
         ]
