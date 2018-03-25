@@ -107,7 +107,7 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     div [ css [ fontFamily monospace ] ]
-        [ p [] [ text "Type a word and press <enter> to eliminate it." ]
+        [ p [] [ text "Type a word and press <enter> to make it go away." ]
         , input
             [ onInput Change
             , onEnter Confirm
@@ -196,5 +196,5 @@ untyped =
 typed : Style
 typed =
     Css.batch
-        [ color (hex "aaa")
+        [ color (hex "888")
         ]
