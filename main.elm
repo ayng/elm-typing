@@ -67,7 +67,7 @@ matching expected actual =
 type alias Model =
     { field : String
     , placeholder : String
-    , targets : List Target
+    , targets : List String
     }
 
 
@@ -76,9 +76,9 @@ init =
     ( { field = ""
       , placeholder = "Click here to begin!"
       , targets =
-            [ target "hello"
-            , target "HENlo"
-            , target "world!"
+            [ "hello"
+            , "foo"
+            , "world!"
             ]
       }
     , Cmd.none
@@ -116,16 +116,7 @@ update msg model =
         Confirm ->
             ( { model
                 | field = ""
-                , targets =
-                    List.foldr
-                        (\t ts ->
-                            if List.foldr (&&) True t.done then
-                                ts
-                            else
-                                t :: ts
-                        )
-                        []
-                        model.targets
+                , targets = List.filter (\t -> model.field /= t) model.targets
               }
             , Cmd.none
             )
@@ -133,7 +124,6 @@ update msg model =
         Change text ->
             ( { model
                 | field = text
-                , targets = List.map (\t -> shoot t text) model.targets
               }
             , Cmd.none
             )
@@ -165,6 +155,11 @@ typed =
     Css.batch
         [ color (hex "aaa")
         ]
+
+
+viewStringTarget : String -> String -> List (Html Msg)
+viewStringTarget expected actual =
+    viewTarget (shoot (target expected) actual)
 
 
 viewTarget : Target -> List (Html Msg)
@@ -201,6 +196,11 @@ onEnter msg =
         on "keydown" (Json.Decode.andThen isEnter keyCode)
 
 
+
+-- Html.Styled.Events.on : String -> Json.Decode.Decoder msg -> Html.Styled.Attribute msg
+-- Json.Decode.andThen : (a -> Json.Decode.Decoder b) -> Json.Decode.Decoder a -> Json.Decode.Decoder b
+
+
 view : Model -> Html Msg
 view model =
     div []
@@ -215,7 +215,7 @@ view model =
             []
         , ul []
             (List.map
-                (\t -> li [] (viewTarget t))
+                (\t -> li [] (viewStringTarget t model.field))
                 model.targets
             )
         ]
