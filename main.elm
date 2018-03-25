@@ -3,17 +3,15 @@ module Main exposing (..)
 import Json.Decode
 import String
 import List
-import Maybe
 import Css exposing (..)
 import Css.Colors exposing (black)
-import Keyboard
-import Char exposing (KeyCode)
 import Html
 import Html.Styled exposing (..)
 import Html.Styled.Events exposing (on, onInput, onFocus, onBlur, keyCode)
 import Html.Styled.Attributes exposing (css, placeholder, value)
 
 
+main : Program Never Model Msg
 main =
     Html.program
         { init = init
