@@ -37,7 +37,10 @@ init =
     ( { field = ""
       , placeholder = "Click here to begin!"
       , targets =
-            List.repeat 500 "hello"
+            [ "hello"
+            , "world!"
+            , "foo bar"
+            ]
       }
     , Cmd.none
     )
@@ -103,17 +106,23 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ input
+    div [ css [ fontFamily monospace ] ]
+        [ p [] [ text "Type a word and press <enter> to eliminate it." ]
+        , input
             [ onInput Change
             , onEnter Confirm
             , onFocus Focus
             , onBlur Blur
             , placeholder model.placeholder
+
+            {- Setting the input value field to a model member introduces the
+               "cursor jump" bug: https://github.com/elm-lang/html/issues/105
+            -}
             , value model.field
             ]
             []
-        , ul []
+        , ul
+            [ css [ listStyle none ] ]
             (List.map
                 (\target ->
                     let
