@@ -1,5 +1,6 @@
 module Main exposing (..)
 
+import Dictionary
 import Json.Decode
 import String
 import List
@@ -7,8 +8,9 @@ import Css exposing (..)
 import Css.Colors exposing (black)
 import Html
 import Html.Styled exposing (..)
-import Html.Styled.Events exposing (on, onInput, onFocus, onBlur, keyCode)
+import Html.Styled.Events exposing (on, onInput, onFocus, onBlur, keyCode, onClick)
 import Html.Styled.Attributes exposing (css, placeholder, value)
+import Time exposing (Time, second)
 
 
 main : Program Never Model Msg
@@ -29,18 +31,18 @@ type alias Model =
     { field : String
     , placeholder : String
     , targets : List String
+    , state : State
     }
+
+type State = Alive | Dead
 
 
 init : ( Model, Cmd Msg )
 init =
     ( { field = ""
       , placeholder = "Click here to begin!"
-      , targets =
-            [ "hello"
-            , "world!"
-            , "foo bar"
-            ]
+      , targets = []
+      , state = Alive
       }
     , Cmd.none
     )
@@ -55,11 +57,24 @@ type Msg
     | Confirm
     | Focus
     | Blur
+    | Tick Time
+    | PlayAgain
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        PlayAgain ->
+            init
+        Tick time ->
+            let
+                foo = Debug.log "whatever" time
+                numTargets = List.length model.targets
+            in
+                if numTargets > 3 then
+                    ( { model | state = Dead }, Cmd.none )
+                else
+                    ( { model | targets = Dictionary.getWord ((truncate time) * (truncate time)) :: model.targets } , Cmd.none )
         Blur ->
             ( { model
                 | placeholder = "Click here to resume"
@@ -96,16 +111,28 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch
-        []
+    Time.every second Tick
 
 
 
 -- VIEW
 
-
-view : Model -> Html Msg
 view model =
+    case model.state of
+        Alive ->
+            viewAlive model
+        Dead ->
+            viewDead model
+
+viewDead : Model -> Html Msg
+viewDead model =
+    div [ css [ fontFamily monospace ] ]
+        [ p [] [ text "YOU DIED" ]
+        , button [ onClick PlayAgain ] [ text "Play again" ]
+        ]
+
+viewAlive : Model -> Html Msg
+viewAlive model =
     div [ css [ fontFamily monospace ] ]
         [ p [] [ text "Type a word and press <enter> to make it go away." ]
         , input
